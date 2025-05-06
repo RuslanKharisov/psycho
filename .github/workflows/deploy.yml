@@ -20,7 +20,7 @@ jobs:
 
       - name: Build Linux binary
         run: |
-          GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/main.go
+          GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/tg-bot-app/main.go
 
       - name: Create .env from secrets
         run: |
