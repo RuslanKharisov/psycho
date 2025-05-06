@@ -1,4 +1,4 @@
-name: Deploy Bot with PM2
+name: Deploy Bot
 
 on:
   push:
@@ -34,31 +34,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy and restart with PM2
+      - name: Upload files
         run: |
-          # Копируем файлы на сервер
-          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:~/tg-bot-app/
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app"
+          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-          # Управление процессом через PM2
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd ~/tg-bot-app
-            chmod +x tg-bot-app
-            
-            # Проверяем, существует ли процесс
-            if pm2 id tg-bot-app > /dev/null; then
-              echo "Restarting existing PM2 process..."
-              pm2 restart tg-bot-app --update-env
-            else
-              echo "Starting new PM2 process..."
-              pm2 start ./tg-bot-app --name tg-bot-app \
-                --log ~/tg-bot-app/logs/app.log \
-                --error ~/tg-bot-app/logs/error.log \
-                --time
-              pm2 save
-              pm2 startup | grep -v "sudo" | bash
-            fi
-            
-            # Логи статуса
-            pm2 status
-            pm2 logs tg-bot-app --lines 20
-          EOF
+      - name: Restart via PM2
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+            cd /home/admin2/tg-bot-app &&
+            export $(cat .env | xargs) &&
+            pm2 delete tg-bot-app || true &&
+            pm2 start ./tg-bot-app --name tg-bot-app &&
+            pm2 save
+          '
+
+      - name: PM2 status
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "pm2 status"
