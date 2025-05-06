@@ -34,17 +34,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Stop service (if running)
+      - name: Upload files
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user stop telegram-bot-go.service || true"
-
-      - name: Deploy files
-        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app"
           scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-      - name: Start service
+      - name: Restart via PM2
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user start telegram-bot-go.service"
-          sleep 5
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user status telegram-bot-go.service"
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
+            cd /home/admin2/tg-bot-app &&
+            export $(cat .env | xargs) &&
+            pm2 delete tg-bot-app || true &&
+            pm2 start ./tg-bot-app --name tg-bot-app &&
+            pm2 save
+          '
+
+      - name: PM2 status
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "pm2 status"
