@@ -18,33 +18,33 @@ jobs:
           go-version: "1.22"
 
       - name: Build for Linux
-        run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/tg-bot-app/main.go # Изменил имя бинарника
+        run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/tg-bot-app/main.go
 
-      - name: Create .env file from secrets
+      - name: Create .env file
         run: |
-          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > .env  # Использую > вместо >> чтобы перезаписать
+          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > .env
           echo "OPENAI_KEY=${{ secrets.OPENAI_KEY }}" >> .env
           echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
           echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
 
-      - name: Setup SSH key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Stop service (if running)
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user stop telegram-bot-go.service || true"
+
       - name: Deploy files
         run: |
-          # Создаем целевую директорию если ее нет
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app"
-
-          # Копируем бинарник и .env
           scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
-
-          # Даем права на исполнение
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-      - name: Restart service
+      - name: Start service
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl restart telegram-bot-go.service"
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user start telegram-bot-go.service"
+          sleep 5
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "systemctl --user status telegram-bot-go.service"
