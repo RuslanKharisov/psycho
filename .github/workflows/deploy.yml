@@ -36,15 +36,25 @@ jobs:
 
       - name: Deploy files
         run: |
-          # Создаем целевую директорию если ее нет
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app"
+          # Создаем целевую и временную директории, если их нет
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app/tmp"
 
-          # Копируем бинарник и .env
-          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
+          # Копируем бинарник и .env во временную директорию
+          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/tmp/
+
+          # Останавливаем сервис перед заменой файлов
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl stop telegram-bot-go.service"
+
+          # Перемещаем новые файлы из временной директории и удаляем tmp
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "\
+          mv /home/admin2/tg-bot-app/tmp/tg-bot-app /home/admin2/tg-bot-app/tg-bot-app && \
+          mv /home/admin2/tg-bot-app/tmp/.env /home/admin2/tg-bot-app/.env && \
+          rm -rf /home/admin2/tg-bot-app/tmp"
 
           # Даем права на исполнение
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
       - name: Restart service
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl restart telegram-bot-go.service"
+          # Перезапускаем systemd сервис
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl start telegram-bot-go.service"
