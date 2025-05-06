@@ -1,0 +1,44 @@
+# .github/workflows/deploy.yml
+name: Deploy Bot
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+
+      - name: Build for Linux
+        run: GOOS=linux GOARCH=amd64 go build -o bin/telegram-bot-go cmd/main.go
+
+      - name: Create .env file from secrets
+        run: |
+          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" >> .env
+          echo "OPENAI_KEY=${{ secrets.OPENAI_KEY }}" >> .env
+          echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
+          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via scp
+        run: |
+          scp bin/telegram-bot-go .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/${{ secrets.VPS_USER }}/telegram-bot-go/
+
+      - name: Restart service via ssh
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl restart telegram-bot-go.service"
