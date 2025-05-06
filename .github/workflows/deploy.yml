@@ -6,55 +6,105 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Запускаем на свежей виртуальной машине Ubuntu от GitHub
 
     steps:
-      - name: Checkout code
+      - name: Checkout code # Шаг 1: Клонируем код из репозитория
         uses: actions/checkout@v3
 
-      - name: Set up Go
+      - name: Set up Go # Шаг 2: Устанавливаем нужную версию Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.22"
+          go-version: "1.24" # Укажите вашу версию Go
 
-      - name: Build for Linux
+      - name: Build for Linux # Шаг 3: Собираем бинарный файл для Linux
         run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/tg-bot-app/main.go
+        # GOOS=linux GOARCH=amd64 - указываем целевую ОС и архитектуру
+        # -o bin/tg-bot-app - указываем имя и путь для скомпилированного файла
+        # cmd/tg-bot-app/main.go - путь к главному файлу вашего приложения
 
-      - name: Create .env file
+      - name: Create .env file # Шаг 4: Создаем .env файл с секретами
         run: |
           echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > .env
           echo "OPENAI_KEY=${{ secrets.OPENAI_KEY }}" >> .env
           echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
           echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+        # Этот .env файл будет скопирован на сервер
 
-      - name: Setup SSH
+      - name: Setup SSH # Шаг 5: Настраиваем SSH-ключ для подключения к серверу
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          # Получаем и добавляем fingerprint сервера
+          mkdir -p ~/.ssh # Создаем директорию .ssh, если ее нет
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa # Записываем приватный SSH-ключ из секретов GitHub
+          chmod 600 ~/.ssh/id_rsa # Устанавливаем правильные права на ключ
+          # Получаем и добавляем fingerprint сервера в known_hosts, чтобы избежать интерактивного подтверждения
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-          # Проверяем подключение
+          # Проверяем SSH-подключение к серверу (опционально, но полезно для отладки)
           ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'SSH connection successful!'"
 
-      - name: Upload files
+      - name: Upload files # Шаг 6: Загружаем файлы на сервер
         run: |
-          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
+          # Копируем скомпилированный бинарник и .env файл на сервер
+          scp -i ~/.ssh/id_rsa bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
+          # Делаем бинарный файл исполняемым на сервере
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-      - name: Restart via PM2
+      - name: Restart via PM2 # Шаг 7: Перезапускаем приложение на сервере с помощью PM2
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-              export NVM_DIR="$HOME/.nvm"
-              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Начало многострочной команды, которая будет выполнена на сервере
+            set -e # Прерывать выполнение скрипта при любой ошибке
 
-              cd /home/admin2/tg-bot-app &&
-              export $(cat .env | xargs) &&
-              pm2 delete tg-bot-app || true &&
-              pm2 start ./tg-bot-app --name tg-bot-app &&
-              pm2 save
+            # 0. Загрузка окружения NVM (Node Version Manager)
+            # PM2 обычно устанавливается через npm, который управляется NVM.
+            # Это необходимо, чтобы команда pm2 была доступна в PATH.
+            export NVM_DIR="$HOME/.nvm"
+            # Проверяем, существует ли скрипт nvm.sh и загружаем его, если да
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            # Эта строка эквивалентна 'source "$NVM_DIR/nvm.sh"' но работает в sh-совместимых оболочках
+
+            # 1. Переходим в директорию приложения на сервере
+            cd /home/admin2/tg-bot-app || exit 1 # Если не удалось перейти, выходим с ошибкой
+
+            # 2. Загружаем переменные окружения из .env файла
+            # Это гарантирует, что PM2 и ваше приложение получат актуальные переменные
+            # `set -a` экспортирует все переменные, которые будут определены далее
+            # `source .env` загружает переменные из файла
+            # `set +a` отключает автоматический экспорт
+            # Альтернативно, если source .env не работает в вашей удаленной оболочке или .env имеет сложный синтаксис:
+            # export $(grep -v '^#' .env | xargs)
+            # Мы используем вариант из вашего примера, он более надежен:
+            if [ -f .env ]; then
+              export $(cat .env | sed 's/#.*//g' | xargs)
+            fi
+            
+            # 3. Удаляем старый процесс PM2, если он существует (|| true чтобы не было ошибки, если его нет)
+            pm2 delete tg-bot-app || true
+
+            # 4. Запускаем новый бинарный файл через PM2
+            # ./tg-bot-app - путь к бинарнику относительно текущей директории (/home/admin2/tg-bot-app)
+            # --name tg-bot-app - имя процесса в PM2
+            # PM2 автоматически подхватит переменные окружения, которые мы экспортировали выше
+            pm2 start ./tg-bot-app --name tg-bot-app
+
+            # 5. Сохраняем текущий список процессов PM2, чтобы он восстановился после перезагрузки сервера
+            pm2 save
           EOF
+          # Конец многострочной команды
 
-      - name: PM2 status
+      - name: PM2 status # Шаг 8: Проверяем статус PM2
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "pm2 status"
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Начало многострочной команды
+            set -e # Прерывать выполнение скрипта при любой ошибке
+
+            # Загрузка окружения NVM, как и в предыдущем шаге, чтобы pm2 был доступен
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+            # Выводим статус всех процессов PM2
+            pm2 status
+            echo "--------------------"
+            # Выводим логи для конкретного приложения (последние 15 строк)
+            pm2 logs tg-bot-app --lines 15 --nostream
+          EOF
+          # Конец многострочной команды
