@@ -35,7 +35,7 @@ jobs:
           # Получаем и добавляем fingerprint сервера
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
           # Проверяем подключение
-          ssh -i ~/.ssh/id_rsa ${{secrets.SERVER_USER}}@${{secrets.ENV_SERVER}} "echo 'SSH connection successful!'"
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "echo 'SSH connection successful!'"
 
       - name: Upload files
         run: |
