@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Deploy Bot
 
 on:
@@ -19,11 +18,11 @@ jobs:
           go-version: "1.22"
 
       - name: Build for Linux
-        run: GOOS=linux GOARCH=amd64 go build -o bin/telegram-bot-go cmd/main.go
+        run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/main.go # Изменил имя бинарника
 
       - name: Create .env file from secrets
         run: |
-          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" >> .env
+          echo "TG_TOKEN=${{ secrets.TG_TOKEN }}" > .env  # Использую > вместо >> чтобы перезаписать
           echo "OPENAI_KEY=${{ secrets.OPENAI_KEY }}" >> .env
           echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
           echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
@@ -35,10 +34,17 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy via scp
+      - name: Deploy files
         run: |
-          scp bin/telegram-bot-go .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/${{ secrets.VPS_USER }}/telegram-bot-go/
+          # Создаем целевую директорию если ее нет
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p /home/admin2/tg-bot-app"
 
-      - name: Restart service via ssh
+          # Копируем бинарник и .env
+          scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
+
+          # Даем права на исполнение
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
+
+      - name: Restart service
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl restart telegram-bot-go.service"
