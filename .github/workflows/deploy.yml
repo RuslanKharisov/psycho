@@ -48,45 +48,45 @@ jobs:
           # Делаем бинарный файл исполняемым на сервере
           ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-          - name: Restart via PM2 # Шаг 7: Перезапускаем приложение на сервере с помощью PM2
-          run: |
-            ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-              # Начало многострочной команды, которая будет выполнена на сервере
-              set -e # Прерывать выполнение скрипта при любой ошибке
+      - name: Restart via PM2 # Шаг 7: Перезапускаем приложение на сервере с помощью PM2
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Начало многострочной команды, которая будет выполнена на сервере
+            set -e # Прерывать выполнение скрипта при любой ошибке
 
-              # 0. Загрузка окружения NVM (Node Version Manager)
-              export NVM_DIR="$HOME/.nvm"
-              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            # 0. Загрузка окружения NVM (Node Version Manager)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-              # 1. Переходим в директорию приложения на сервере
-              cd /home/admin2/tg-bot-app || exit 1
+            # 1. Переходим в директорию приложения на сервере
+            cd /home/admin2/tg-bot-app || exit 1
 
-              # 2. Загружаем переменные окружения из .env файла
-              if [ -f .env ]; then
-                export $(cat .env | sed 's/#.*//g' | xargs)
-              fi
-              
-              # 3. Перезапускаем приложение, если оно уже существует, или запускаем, если нет.
-              #    PM2 `restart` сначала попытается остановить и затем запустить процесс с тем же именем.
-              #    Флаг `--update-env` гарантирует, что PM2 обновит переменные окружения для процесса,
-              #    если они были изменены (например, через .env файл, переменные которого мы экспортировали).
-              #    Если процесс `tg-bot-app` не существует, `pm2 restart` завершится ошибкой,
-              #    и тогда выполнится команда после `||` (логическое ИЛИ).
-              echo "Attempting to restart 'tg-bot-app' via PM2..."
-              if pm2 restart tg-bot-app --update-env; then
-                echo "'tg-bot-app' restarted successfully."
-              else
-                echo "'tg-bot-app' not found or restart failed, attempting to start new process..."
-                # Запускаем новый процесс, если перезапуск не удался (например, процесс не существовал)
-                # PM2 автоматически подхватит переменные окружения, экспортированные на шаге 2.
-                pm2 start ./tg-bot-app --name tg-bot-app
-                echo "'tg-bot-app' started successfully."
-              fi
+            # 2. Загружаем переменные окружения из .env файла
+            if [ -f .env ]; then
+              export $(cat .env | sed 's/#.*//g' | xargs)
+            fi
+            
+            # 3. Перезапускаем приложение, если оно уже существует, или запускаем, если нет.
+            #    PM2 `restart` сначала попытается остановить и затем запустить процесс с тем же именем.
+            #    Флаг `--update-env` гарантирует, что PM2 обновит переменные окружения для процесса,
+            #    если они были изменены (например, через .env файл, переменные которого мы экспортировали).
+            #    Если процесс `tg-bot-app` не существует, `pm2 restart` завершится ошибкой,
+            #    и тогда выполнится команда после `||` (логическое ИЛИ).
+            echo "Attempting to restart 'tg-bot-app' via PM2..."
+            if pm2 restart tg-bot-app --update-env; then
+              echo "'tg-bot-app' restarted successfully."
+            else
+              echo "'tg-bot-app' not found or restart failed, attempting to start new process..."
+              # Запускаем новый процесс, если перезапуск не удался (например, процесс не существовал)
+              # PM2 автоматически подхватит переменные окружения, экспортированные на шаге 2.
+              pm2 start ./tg-bot-app --name tg-bot-app
+              echo "'tg-bot-app' started successfully."
+            fi
 
-              # 4. Сохраняем текущий список процессов PM2, чтобы он восстановился после перезагрузки сервера
-              pm2 save
-              echo "PM2 process list saved."
-            EOF
+            # 4. Сохраняем текущий список процессов PM2, чтобы он восстановился после перезагрузки сервера
+            pm2 save
+            echo "PM2 process list saved."
+          EOF
           # Конец многострочной команды
 
       - name: PM2 status # Шаг 8: Проверяем статус PM2
