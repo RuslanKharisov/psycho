@@ -42,9 +42,9 @@ jobs:
           scp bin/tg-bot-app .env ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/admin2/tg-bot-app/
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /home/admin2/tg-bot-app/tg-bot-app"
 
-          - name: Restart via PM2
-          run: |
-            ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+      - name: Restart via PM2
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
               export NVM_DIR="$HOME/.nvm"
               [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
@@ -53,7 +53,7 @@ jobs:
               pm2 delete tg-bot-app || true &&
               pm2 start ./tg-bot-app --name tg-bot-app &&
               pm2 save
-            EOF
+          EOF
 
       - name: PM2 status
         run: |
