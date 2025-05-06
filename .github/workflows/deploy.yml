@@ -18,7 +18,7 @@ jobs:
           go-version: "1.22"
 
       - name: Build for Linux
-        run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/main.go # Изменил имя бинарника
+        run: GOOS=linux GOARCH=amd64 go build -o bin/tg-bot-app cmd/tg-bot-app/main.go # Изменил имя бинарника
 
       - name: Create .env file from secrets
         run: |
