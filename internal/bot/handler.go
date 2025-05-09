@@ -82,7 +82,7 @@ func (r *Router) handleChat(msg *tgbotapi.Message) {
 
 	if err != nil {
 		log.Printf("Ошибка OpenAI: %v", err)
-		r.botAPI.Send(tgbotapi.NewMessage(msg.Chat.ID, "⚠️ Ошибка при вызове OpenAI. Попробуйте позже."))
+		r.botAPI.Send(tgbotapi.NewMessage(msg.Chat.ID, "💙 Кажется, моя нейросеть устала. Дайте ей немного времени и попробуйте снова."))
 		return
 	}
 
