@@ -75,7 +75,7 @@ func (r *Router) handleChat(msg *tgbotapi.Message) {
 	resp, err := r.chatClient.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model:    "ft:gpt-3.5-turbo-0125:personal::BUEsVxqL",
+			Model:    r.model,
 			Messages: messages,
 		},
 	)

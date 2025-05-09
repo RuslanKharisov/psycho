@@ -13,6 +13,7 @@ type Router struct {
 	memorySvc    memory.Memory
 	chatClient   *openai.Client
 	summarizeSvc summarizer.Summarizer
+	model        string
 }
 
 func NewRouter(
@@ -20,12 +21,14 @@ func NewRouter(
 	mem memory.Memory,
 	chatClient *openai.Client,
 	sum summarizer.Summarizer,
+	model string,
 ) *Router {
 	return &Router{
 		botAPI:       botAPI,
 		memorySvc:    mem,
 		chatClient:   chatClient,
 		summarizeSvc: sum,
+		model:        model,
 	}
 }
 
