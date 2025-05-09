@@ -29,6 +29,7 @@ jobs:
           echo "OPENAI_KEY=${{ secrets.OPENAI_KEY }}" >> .env
           echo "REDIS_ADDR=${{ secrets.REDIS_ADDR }}" >> .env
           echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+          echo "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}" >> .env
         # Этот .env файл будет скопирован на сервер
 
       - name: Setup SSH # Шаг 5: Настраиваем SSH-ключ для подключения к серверу
